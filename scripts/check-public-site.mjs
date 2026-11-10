@@ -25,7 +25,14 @@ async function files(directory) {
 const violations = [];
 for (const file of await files(root)) {
   const text = await readFile(file, 'utf8');
+  const relativeFile = path.relative(root, file);
+  const isGeneratedJavaScriptBundle = file.endsWith('.js') && [
+    path.join('public-site', '_astro'),
+    path.join('public-site', 'pagefind'),
+  ].some((directory) => relativeFile.startsWith(`${directory}${path.sep}`));
   for (const [label, pattern] of checks) {
+    // Bundled dependencies can contain example addresses; authored site content is still checked.
+    if (label === 'email address' && isGeneratedJavaScriptBundle) continue;
     if (pattern.test(text)) violations.push(`${path.relative(root, file)}: contains a ${label}`);
   }
 }
