@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - "public-site/**"
+      - "scripts/check-public-site.mjs"
+      - ".github/workflows/deploy-pages.yml"
   workflow_dispatch:
 
 permissions:

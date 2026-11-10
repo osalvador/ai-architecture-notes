@@ -1,9 +1,17 @@
 import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 
 const root = process.cwd();
 const ignored = new Set(['.git', '.github', 'node_modules']);
 const extensions = new Set(['.md', '.mjs', '.js', '.ts', '.astro', '.css', '.json', '.yml', '.yaml', '.toml', '.txt', '.html', '.svg', '.xml']);
+// Pagefind ships translator credits containing email addresses. Exempt only these
+// exact, reviewed bundle bytes; any change requires review and fails closed.
+const reviewedEmailBundles = new Map([
+  ['public-site/_astro/ui-core.Bq6MWQL3.js', '283ac15cb9d1d01d1b17d29649d9f214bdcf0f5554353aae3dfdc2a83fb5f858'],
+  ['public-site/pagefind/pagefind-component-ui.js', 'f7a4ba1403c0dfb23e84e18b4480f95785035d21e5b45a05a08191bd87c84944'],
+  ['public-site/pagefind/pagefind-ui.js', '07b2a55750c180546523435461fd44f0612531bcdc0e8a069fe00eef7741d1f7'],
+]);
 const checks = [
   ['email address', /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i],
   ['credential URL', /https?:\/\/[^/\s:@]+:[^/\s@]+@/i],
@@ -25,14 +33,10 @@ async function files(directory) {
 const violations = [];
 for (const file of await files(root)) {
   const text = await readFile(file, 'utf8');
-  const relativeFile = path.relative(root, file);
-  const isGeneratedJavaScriptBundle = file.endsWith('.js') && [
-    path.join('public-site', '_astro'),
-    path.join('public-site', 'pagefind'),
-  ].some((directory) => relativeFile.startsWith(`${directory}${path.sep}`));
+  const relativeFile = path.relative(root, file).split(path.sep).join('/');
+  const digest = createHash('sha256').update(text).digest('hex');
   for (const [label, pattern] of checks) {
-    // Bundled dependencies can contain example addresses; authored site content is still checked.
-    if (label === 'email address' && isGeneratedJavaScriptBundle) continue;
+    if (label === 'email address' && reviewedEmailBundles.get(relativeFile) === digest) continue;
     if (pattern.test(text)) violations.push(`${path.relative(root, file)}: contains a ${label}`);
   }
 }
